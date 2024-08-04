@@ -53,6 +53,9 @@ class ModelTraining(object):
     def read_train(self):
         self.db.read_data(train=True)
         while self.db.data is None or len(self.db.data.dropna()) < 1000:
+            print("check data is none : ", self.db.data is None)
+            print("count data : ", len(self.db.data.dropna()))
+            
             logger.warning("Check if InfluxDB instance is up / Not sufficient data for Training")
             time.sleep(120)
             self.db.read_data(train=True)
