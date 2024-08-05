@@ -57,8 +57,8 @@ class DATABASE(object):
         self.org = org
         self.bucket = bucket
         self.data = None
-        self.client = None
-        self.query_api = None
+        self.client = InfluxDBClient(url=self.url, token=self.token, org=self.org)
+        self.query_api = self.client.query_api()
         self.write_api = None
         self.config()
         self.connect()
@@ -98,28 +98,31 @@ class DATABASE(object):
             logger.error("Measurement name must be provided")
             return
 
-        # Construct the Flux query based on parameters
+        # Construct the Flux query
+        # Construct the Flux query
         query = (
             f'from(bucket: "{self.bucket}") '
-            f'|> range(start: -1h) '
+            f'|> range(start: -240h) '
             f'|> filter(fn: (r) => r._measurement == "{self.meas}") '
         )
 
+
+        # Apply filters based on parameters
         if train:
-            query += '|> range(start: -75m, stop: -5m) '
+            query += '|> range(start: -240h, stop: -5m) '
         elif valid:
-            query += '|> range(start: -5m) '
-        elif limit:
+            query += '|> range(start: -240h) '
+        if limit:
             query += f'|> limit(n: {limit}) '
 
-        query += (
-            '|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value") '
-        )
-
-        # Execute the query
+        query += '|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")'
+        
         result = self.query_api.query_data_frame(query)
+        print("self meas is : ", self.meas)
+        print("value of result is database.py : ", result)
 
-        print("value of result is : ", result)
+        self.data = result  # Use double brackets to select the column as DataFrame
+
 
     def write_anomaly(self, df, meas='AD'):
         """Write anomaly data to InfluxDB
