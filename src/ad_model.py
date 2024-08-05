@@ -16,6 +16,8 @@
 
 import joblib
 from mdclogpy import Logger
+from influxdb_client.client.query_api import QueryApi
+
 
 logger = Logger(name=__name__)
 
@@ -34,6 +36,7 @@ class modelling(object):
         self.load_model()
         self.load_param()
         self.load_scale()
+
 
     def load_model(self):
         try:
@@ -97,21 +100,56 @@ class CAUSE(object):
         """
         sample = df.copy()
         sample.index = range(len(sample))
-        for i in range(len(sample)):
+        for i in range(min(len(sample), 20)):
             if sample.iloc[i]['Anomaly'] == 1:
-                query = """select * from {} where "{}" = \'{}\' and time<now() and time>now()-20s""".format(db.meas, db.ue, sample.iloc[i][db.ue])
+                db_ue = 'tag_key'  # Set this to the correct column name if needed
+                print("meas", db.meas)
+                print("db_ue", db_ue)
+                print("sample", sample)
+                print("sample.iloc[i]", sample.iloc[i])
+                print("sample.iloc[i][db_ue]", sample.iloc[i][db_ue])
+                print("db", db)
+
+                #default 20s
+                query = f"""
+                from(bucket: "{db.bucket}")
+                |> range(start: -240h)
+                |> filter(fn: (r) => r["_measurement"] == "{db.meas}" and r["{db_ue}"] == "{sample.iloc[i][db_ue]}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                """ 
+
+                print(query)  # Print the query to verify its correctness
+
                 normal = db.query(query)
-                if normal:
-                    normal = normal[db.meas][[db.thpt, db.rsrp, db.rsrq]]
+
+                print("print normal", normal)
+                print(normal.columns)
+
+                if normal is not None and not normal.empty:
+                    # Extract relevant columns from the 'normal' DataFrame
+                    print("db.meas", db.meas)
+                    # normal = normal[db.meas][[db.thpt, db.rsrp, db.rsrq]]
+
+                    print("normal 2", normal)
+                    # Find the degradation using the 'find' method
                     deg = self.find(sample.loc[i, :], normal.max(), db, threshold)
+
                     if deg:
+                        # Set 'Degradation' value in the sample DataFrame
                         sample.loc[i, 'Degradation'] = deg
+
+                        # Determine the 'Anomaly' type based on the degradation information
                         if 'Throughput' in deg and ('RSRP' in deg or 'RSRQ' in deg):
-                            sample.loc[i, 'Anomaly'] = 2
+                            sample.loc[i, 'Anomaly'] = 2  # Both types of anomalies detected
                         else:
-                            sample.loc[i, 'Anomaly'] = 1
+                            sample.loc[i, 'Anomaly'] = 1  # Only one type of anomaly detected
                     else:
+                        # No degradation found
                         sample.loc[i, 'Anomaly'] = 0
+                else:
+                    # Handle cases where 'normal' is None or empty
+                    sample.loc[i, 'Anomaly'] = 0
+
         return sample[['Anomaly', 'Degradation']].values.tolist()
 
     def find(self, row, l, db, threshold):

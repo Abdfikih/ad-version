@@ -59,7 +59,7 @@ class DATABASE(object):
         self.data = None
         self.client = InfluxDBClient(url=self.url, token=self.token, org=self.org)
         self.query_api = self.client.query_api()
-        self.write_api = None
+        self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=5000))
         self.config()
         self.connect()
 
@@ -135,12 +135,22 @@ class DATABASE(object):
             Measurement name
         """
         try:
-            points = [
-                Point(meas).tag("tag_key", "tag_value").field(col, row[col]).time(row["measTimeStampRf"])
-                for _, row in df.iterrows()
-                for col in df.columns
-            ]
-            self.write_api.write(bucket=self.bucket, record=points)
+            points = []
+            for _, row in df.iterrows():
+                # Convert the timestamp to a string format
+                timestamp = row["measTimeStampRf"].strftime('%Y-%m-%dT%H:%M:%SZ') if isinstance(row["measTimeStampRf"], pd.Timestamp) else row["measTimeStampRf"]
+                
+                # Create a Point for each row, adding tags and fields
+                point = Point(meas).tag("tag_key", "tag_value").time(timestamp)
+                for col in df.columns:
+                    if col != "measTimeStampRf":  # Skip the timestamp column
+                        point.field(col, row[col])
+                
+                points.append(point)
+
+            # Write points to InfluxDB
+            # Error Write Anomaly Data to InfluxDB
+            # self.write_api.write(bucket=self.bucket, org=self.org , record=points)
         except (RequestException, ConnectionError) as e:
             logger.error(f"Failed to write data to InfluxDB: {e}")
 
@@ -173,6 +183,15 @@ class DATABASE(object):
             self.bucket = cfg.get('influxdb', 'bucket')
             self.meas = cfg.get('influxdb', "measurement")
 
+        if cfg.has_section('features'):
+            self.thpt = cfg.get('features', "thpt")
+            self.rsrp = cfg.get('features', "rsrp")
+            self.rsrq = cfg.get('features', "rsrq")
+            self.rssinr = cfg.get('features', "rssinr")
+            self.prb = cfg.get('features', "prb_usage")
+            self.ue = cfg.get('features', "ue")
+            self.anomaly = cfg.get('features', "anomaly")
+            self.a1_param = cfg.get('features', "a1_param")
 
 class DUMMY(DATABASE):
     def __init__(self):
