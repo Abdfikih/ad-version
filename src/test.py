@@ -1,19 +1,17 @@
-from database import DATABASE  # Mengimpor class DATABASE dari file database.py
+from database import DATABASE 
 
 def main():
-    # Membuat instance dari DATABASE
     db = DATABASE()
 
-    # Menyambung ke InfluxDB
+
     if db.connect():
         print("Connected to InfluxDB successfully.")
         
-        # Mengatur measurement jika diperlukan
-        db.meas = "UEReports"  # Gantilah dengan nama measurement yang relevan
+       
+        db.meas = "UEReports"  
 
-        # Membaca data
         print("Reading data...")
-        db.read_data(train=True, limit=1000)  # Atur parameter sesuai kebutuhan
+        db.read_data(train=True, limit=1000)  
         print("Data read from InfluxDB:")
         print(db.data)
 

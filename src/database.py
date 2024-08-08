@@ -51,7 +51,7 @@ class DATABASE(object):
         Fetched data from the database
     """
 
-    def __init__(self, url='http://10.97.54.81:80', token='zul9FscXNfNA3wYtKRLHFQxoV9t7k80V', org='influxdata', bucket='RIC-Test'):
+    def __init__(self, url='http://10.106.60.11:80', token='5LTgnfITa11w24CELs0wtwUPzT3VVdJX', org='influxdata', bucket='RIC-Test'):
         self.url = url
         self.token = token
         self.org = org
